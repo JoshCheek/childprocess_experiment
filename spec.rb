@@ -82,12 +82,13 @@ RSpec.describe 'the process' do
     end_time = Time.now
     expect(end_time - start_time).to be > 1
 
-    # this should mean that it can't find the process
+    # this error should mean that it can't find the process, ie b/c its dead
+    # if it fails this, then check your processes, it should have orphans
     expect { Process.kill 0, result.pid }.to raise_error Errno::ESRCH
   end
 
   # how to check the process is dead?
-  xit 'cleans up the process and all its children after a timeout' do
+  it 'cleans up the process and all its children after a timeout' do
     start_time = Time.now
     result = run stdin: "abc", program: 'ruby', argv: ['-e', '
       puts $$
@@ -95,10 +96,24 @@ RSpec.describe 'the process' do
       sleep
     '], timeout: 1
     end_time = Time.now
-    p end_time - start_time
+
+    # it did timeout
     expect(end_time - start_time).to be > 1
     expect(result.code).to eq 1
-    # expect(result.stdout).to eq ""
+
+    # the two children printed their pids
+    pids = result.stdout.lines.map do |line|
+      expect(line).to match /^\d+$/
+      line.to_i
+    end
+    expect(pids.length).to eq 2
+    expect(pids[0]).to eq result.pid # sanity check
+
+    # they are both dead
+    pids.each do |pid|
+      # this error should mean that it can't find the process, ie b/c its dead
+      expect { Process.kill 0, pid }.to raise_error Errno::ESRCH
+    end
   end
 
   it 'cleans up the process and all its children when the parent is interrupted'
