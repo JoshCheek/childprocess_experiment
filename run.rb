@@ -4,7 +4,8 @@ Result = Struct.new :code, :stdout, :stderr, :pid, :pgid, :timed_out do
   alias timed_out? timed_out
 end
 
-# what is the differnce between the group id and the effective group id?
+# what is the difference between the group id and the effective group id?
+# there are also sessions
 
 def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   result = Result.new
@@ -15,10 +16,13 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   read_stdin,  write_stdin  = IO.pipe
 
   # spawn
-  result.pid  = spawn program, *argv, pgroup: true, in: read_stdin, out: write_stdout, err: write_stderr
-  # p pid: result.pid
+  result.pid = spawn program, *argv, pgroup: true, in: read_stdin, out: write_stdout, err: write_stderr
+  old_int_handler = trap 'INT' do
+    kill! result
+    trap old_int_handler
+    Process.kill 'INT', $$
+  end
   result.pgid = Process.getpgid(result.pid)
-  # p pgid: result.pgid
 
   # close pipes in parent so that child has the last open handle
   # thus closing them in the child closes them completely
@@ -38,19 +42,9 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   end
 
 rescue Timeout::Error
-  puts "TIMED OUT"
   result.timed_out = true
-  Process.kill '-KILL', result.pgid
-  Process.wait result.pid
-  result.code = $?.exitstatus || 1
+  kill! result
 ensure
-  # if child.stop
-  #   puts "GETTING CODE"
-  #   result.code = child.exit_code
-  # else
-  #   puts "Using a code of 1"
-  #   result.code = 1
-  # end
   result.stdout = read_and_close(read_stdout)
   result.stderr = read_and_close(read_stderr)
   return result unless $!
@@ -70,4 +64,10 @@ def read_and_close(stream)
   end
   stream.close
   printed
+end
+
+def kill!(result)
+  Process.kill '-KILL', result.pgid
+  Process.wait result.pid
+  result.code = $?.exitstatus || 1
 end
