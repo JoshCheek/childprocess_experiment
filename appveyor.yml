@@ -1,0 +1,22 @@
+# I don't really understand what this is for
+version: "{build}"
+
+branches:
+  only:
+    - master
+
+# Disable normal Windows builds in favor of our test script.
+build: off
+
+install:
+  - SET PATH=C:\Ruby%ruby_version%\bin;%PATH%
+  - ruby --version
+  - gem --version
+  - rake install
+
+test_script:
+  - bundle exec rspec spec.rb
+
+environment:
+  matrix:
+    - ruby_version: '21'
