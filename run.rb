@@ -4,17 +4,17 @@ Result = Struct.new :code, :stdout, :stderr, :pid, :timed_out do
   alias timed_out? timed_out
 end
 
-def run(stdin:, program:, argv:, timeout: nil)
-  read_stdout, write_stdout = IO.pipe
-  read_stderr, write_stderr = IO.pipe
+def run(stdin:, program:, argv:, timeout: nil, write_stdout:nil, write_stderr:nil)
+  read_stdout, write_stdout = IO.pipe unless write_stdout
+  read_stderr, write_stderr = IO.pipe unless write_stderr
   child = ChildProcess.build program, *argv
   child.leader    = true
   child.duplex    = true
   child.io.stdout = write_stdout
   child.io.stderr = write_stderr
   child.start
-  write_stdout.close
-  write_stderr.close
+  write_stdout.close if read_stdout
+  write_stderr.close if read_stderr
   result = Result.new
   result.pid = child.pid
   # child.io.stdin.binmode
@@ -45,6 +45,7 @@ ensure
 end
 
 def read_and_close(stream)
+  return "" unless stream
   read = ""
   loop do
     readable, _ = IO.select [stream], [$stdout]
@@ -58,4 +59,3 @@ def read_and_close(stream)
   stream.close
   read
 end
-

@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+require_relative 'run'
+
+program, *argv = ARGV
+run stdin: "", program: program, argv: argv, write_stdout: $stdout, write_stderr: $stderr

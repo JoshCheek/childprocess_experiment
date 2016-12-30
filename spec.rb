@@ -57,6 +57,29 @@ RSpec.describe 'the process' do
   end
 
   it 'cleans up the process and all its children when the parent is interrupted' do
+    read, write = IO.pipe
+    filepath = File.realpath('run', __dir__)
+    program_pid = spawn filepath, 'ruby', '-e', '
+      puts $$
+      spawn "ruby", "-e", "puts $$; $stdout.flush; sleep"
+      sleep
+    ', out: write, err: write
+    write.close
 
+    puts "first child pid"
+    child_pid = read.gets
+    expect(child_pid).to match /^\d+$/
+
+    puts "second child pid"
+    grandchild_pid = read.gets
+    expect(grandchild_pid).to match /^\d+$/
+
+    puts "killing the program"
+    Process.kill 'INT', program_pid
+    Process.wait program_pid
+
+    # this error should mean that it can't find the process, ie b/c its dead
+    expect { Process.kill 0, child_pid.to_i      }.to raise_error Errno::ESRCH
+    expect { Process.kill 0, grandchild_pid.to_i }.to raise_error Errno::ESRCH
   end
 end
