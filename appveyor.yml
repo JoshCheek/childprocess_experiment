@@ -15,7 +15,7 @@ install:
   - rake install
 
 test_script:
-  - bundle exec rspec spec.rb
+  - bundle exec rspec spec.rb --format documentation --fail-fast
 
 environment:
   matrix:
