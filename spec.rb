@@ -9,7 +9,7 @@ def run(stdin:, program:, argv:, timeout: nil)
   read_stdout, write_stdout = IO.pipe
   read_stderr, write_stderr = IO.pipe
   child = ChildProcess.build program, *argv
-  # child.leader = true
+  child.leader    = true
   child.duplex    = true
   child.io.stdout = write_stdout
   child.io.stderr = write_stderr
