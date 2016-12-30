@@ -1,6 +1,6 @@
 require 'timeout'
 
-Result = Struct.new :code, :stdout, :stderr, :pid, :timed_out do
+Result = Struct.new :code, :stdout, :stderr, :pid, :pgid, :timed_out do
   alias timed_out? timed_out
 end
 
@@ -13,12 +13,12 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   read_stdout, write_stdout = IO.pipe unless write_stdout
   read_stderr, write_stderr = IO.pipe unless write_stderr
   read_stdin,  write_stdin  = IO.pipe
-  # child.io.stdin.binmode
-  # child.io.stdin.sync = true
 
   # spawn
-  # child.leader    = true
-  result.pid = spawn program, *argv, in: read_stdin, out: write_stdout, err: write_stderr
+  result.pid  = spawn program, *argv, pgroup: true, in: read_stdin, out: write_stdout, err: write_stderr
+  # p pid: result.pid
+  result.pgid = Process.getpgid(result.pid)
+  # p pgid: result.pgid
 
   # close pipes in parent so that child has the last open handle
   # thus closing them in the child closes them completely
@@ -27,6 +27,7 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   write_stderr.close if read_stderr
 
   # send standard input
+  write_stdin.sync = true
   stdin.each_char { |c| write_stdin.write c }
   write_stdin.close
 
@@ -39,9 +40,9 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
 rescue Timeout::Error
   puts "TIMED OUT"
   result.timed_out = true
-  Process.kill 'KILL', result.pid
+  Process.kill '-KILL', result.pgid
   Process.wait result.pid
-  result.code = $?.exitstatus
+  result.code = $?.exitstatus || 1
 ensure
   # if child.stop
   #   puts "GETTING CODE"

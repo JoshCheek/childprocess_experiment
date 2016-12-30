@@ -82,4 +82,6 @@ RSpec.describe 'the process' do
     expect { Process.kill 0, child_pid.to_i      }.to raise_error Errno::ESRCH
     expect { Process.kill 0, grandchild_pid.to_i }.to raise_error Errno::ESRCH
   end
+
+  it 'cleans up the process and all its children when the child exits normally'
 end
