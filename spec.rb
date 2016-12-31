@@ -93,7 +93,7 @@ RSpec.describe 'the process' do
     assert_dead [program.pid, child_pid.to_i, grandchild_pid.to_i]
   end
 
-  xit 'cleans up the process and all its children when the child exits normally' do
+  it 'cleans up the process and all its children when the child exits normally' do
     read, write = IO.pipe
     filepath = File.realpath('run', __dir__)
     program = ChildProcess.build 'ruby', filepath, '--', 'ruby', '-e', '
