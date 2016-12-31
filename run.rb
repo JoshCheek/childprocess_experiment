@@ -34,7 +34,10 @@ rescue ChildProcess::TimeoutError
   result.code = child.exit_code
 ensure
   if $!
-    child.stop
+    begin
+      child.stop
+    rescue NoMethodError
+    end
     result.code = child.exit_code
   end
   result.stdout = read_and_close(read_stdout)
