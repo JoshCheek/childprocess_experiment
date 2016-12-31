@@ -1,10 +1,6 @@
 # I don't really understand what this is for
 version: "{build}"
 
-branches:
-  only:
-    - master
-
 # Disable normal Windows builds in favor of our test script.
 build: off
 
