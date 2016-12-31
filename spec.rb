@@ -113,11 +113,12 @@ RSpec.describe 'the process' do
     expect(child_pid).to match /^\d+$/
     expect(grandchild_pid).to match /^\d+$/
 
+    program.wait
+
     # they're all dead
     assert_dead [program.pid, child_pid.to_i, grandchild_pid.to_i]
 
     # it exited normally
-    program.wait
     expect(program.exit_code).to eq 0
   end
 end

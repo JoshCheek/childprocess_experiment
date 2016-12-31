@@ -32,7 +32,7 @@ rescue ChildProcess::TimeoutError
   child.stop
   result.code = child.exit_code
 ensure
-  if $!
+  if $! || ChildProcess.unix?
     begin
       child.stop
     rescue NoMethodError
