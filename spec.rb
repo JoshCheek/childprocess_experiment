@@ -2,6 +2,19 @@ require 'rspec'
 require_relative 'run'
 
 RSpec.describe 'the process' do
+  def assert_dead(pids)
+    Array(pids).each do |pid|
+      message = <<-MESSAGE.gsub(/^ */, '')
+        Expected Errno::ESRCH when checking pid #{pid.inspect},
+        Which means that it can't find the process (b/c its dead)
+        This was not raised, which means you should have orphans
+        So check your processes to make sure. If you have them, kill them by hand,
+        if not, this test needs to be improved to actually check for orphans.
+      MESSAGE
+      expect { Process.kill 0, pid }.to raise_error(Errno::ESRCH), message
+    end
+  end
+
   it 'can echo stdin to stdout' do
     result = run stdin: "abc", program: 'ruby', argv: ['-e', '$stdout.puts $stdin.gets']
     expect(result.code).to eq 0
@@ -21,10 +34,7 @@ RSpec.describe 'the process' do
     result = run stdin: "abc", program: 'ruby', argv: ['-e', 'sleep'], timeout: 1
     end_time = Time.now
     expect(end_time - start_time).to be > 1
-
-    # this error should mean that it can't find the process, ie b/c its dead
-    # if it fails this, then check your processes, it should have orphans
-    expect { Process.kill 0, result.pid }.to raise_error Errno::ESRCH
+    assert_dead result.pid
   end
 
   # how to check the process is dead?
@@ -41,19 +51,14 @@ RSpec.describe 'the process' do
     expect(end_time - start_time).to be > 1
     expect(result.code).to eq 1
 
-    # the two children printed their pids
+    # the two children printed their pids, both are dead
     pids = result.stdout.lines.map do |line|
       expect(line).to match /^\d+$/
       line.to_i
     end
     expect(pids.length).to eq 2
     expect(pids[0]).to eq result.pid # sanity check
-
-    # they are both dead
-    pids.each do |pid|
-      # this error should mean that it can't find the process, ie b/c its dead
-      expect { Process.kill 0, pid }.to raise_error Errno::ESRCH
-    end
+    assert_dead pids
   end
 
   it 'cleans up the process and all its children when the parent is interrupted' do
@@ -66,22 +71,37 @@ RSpec.describe 'the process' do
     ', out: write, err: write
     write.close
 
-    puts "first child pid"
+    # get the pids
     child_pid = read.gets
-    expect(child_pid).to match /^\d+$/
-
-    puts "second child pid"
     grandchild_pid = read.gets
+    expect(child_pid).to match /^\d+$/
     expect(grandchild_pid).to match /^\d+$/
 
-    puts "killing the program"
+    # interrupt the program
     Process.kill 'INT', program_pid
     Process.wait program_pid
 
-    # this error should mean that it can't find the process, ie b/c its dead
-    expect { Process.kill 0, child_pid.to_i      }.to raise_error Errno::ESRCH
-    expect { Process.kill 0, grandchild_pid.to_i }.to raise_error Errno::ESRCH
+    assert_dead [program_pid, child_pid.to_i, grandchild_pid.to_i]
   end
 
-  it 'cleans up the process and all its children when the child exits normally'
+  it 'cleans up the process and all its children when the child exits normally', t:true do
+    result = run stdin: "abc", program: 'ruby', argv: ['-e', '
+      puts $$
+      read, write = IO.pipe
+      spawn "ruby", "-e", "puts $$; $stdout.flush; $stderr.puts :started; $stderr.close; sleep", err: write
+      write.close
+      read.gets
+      read.close
+    ']
+
+    # printed and exited like we expect
+    expect(result.stderr).to be_empty
+    expect(result.stdout).to match /^#{result.pid}\n(\d+)$/
+    grandchild_pid = result.stdout.lines.last.to_i
+    expect(result.code).to eq 0
+
+    # killed the children
+    assert_dead result.pid
+    assert_dead grandchild_pid
+  end
 end

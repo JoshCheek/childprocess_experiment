@@ -15,13 +15,18 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
   read_stderr, write_stderr = IO.pipe unless write_stderr
   read_stdin,  write_stdin  = IO.pipe
 
-  # spawn
-  result.pid = spawn program, *argv, pgroup: true, in: read_stdin, out: write_stdout, err: write_stderr
+  needs_int_handler_reset = true
   old_int_handler = trap 'INT' do
     kill! result
-    trap old_int_handler
+    if needs_int_handler_reset
+      trap 'INT', old_int_handler
+      needs_int_handler_reset = false
+    end
     Process.kill 'INT', $$
   end
+
+  # spawn
+  result.pid = spawn program, *argv, pgroup: true, in: read_stdin, out: write_stdout, err: write_stderr
   result.pgid = Process.getpgid(result.pid)
 
   # close pipes in parent so that child has the last open handle
@@ -43,10 +48,14 @@ def run(stdin:, program:, argv:, timeout: 0, write_stdout:nil, write_stderr:nil)
 
 rescue Timeout::Error
   result.timed_out = true
-  kill! result
 ensure
+  kill! result
   result.stdout = read_and_close(read_stdout)
   result.stderr = read_and_close(read_stderr)
+  if needs_int_handler_reset
+    trap 'INT', old_int_handler
+    needs_int_handler_reset = false
+  end
   return result unless $!
 end
 
@@ -67,7 +76,11 @@ def read_and_close(stream)
 end
 
 def kill!(result)
-  Process.kill '-KILL', result.pgid
-  Process.wait result.pid
-  result.code = $?.exitstatus || 1
+  Process.kill '-KILL', result.pgid if result.pgid
+  if result.pid
+    Process.wait result.pid
+    result.code = $?.exitstatus || 1
+  end
+rescue Errno::ECHILD # No child processes
+rescue Errno::ESRCH  # No such process (eg non-child process)
 end
