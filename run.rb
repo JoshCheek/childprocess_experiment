@@ -22,26 +22,24 @@ def run(stdin:, program:, argv:, timeout: nil, write_stdout:nil, write_stderr:ni
   stdin.each_char { |c| child.io.stdin.write c }
   child.io.stdin.close
   if timeout
-    puts "WAITING"
     child.poll_for_exit(timeout)
   else
     child.wait
   end
-  child.exit_code
+  result.code = child.exit_code
 rescue ChildProcess::TimeoutError
   puts "TIMED OUT"
   result.timed_out = true
+  child.stop
+  result.code = child.exit_code
 ensure
-  if child.stop
-    puts "GETTING CODE"
+  if $!
+    child.stop
     result.code = child.exit_code
-  else
-    puts "Using a code of 1"
-    result.code = 1
   end
   result.stdout = read_and_close(read_stdout)
   result.stderr = read_and_close(read_stderr)
-  return result
+  return result unless $!
 end
 
 def read_and_close(stream)
