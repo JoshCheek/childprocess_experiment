@@ -28,7 +28,6 @@ def run(stdin:, program:, argv:, timeout: nil, write_stdout:nil, write_stderr:ni
   end
   result.code = child.exit_code
 rescue ChildProcess::TimeoutError
-  puts "TIMED OUT"
   result.timed_out = true
   child.stop
   result.code = child.exit_code

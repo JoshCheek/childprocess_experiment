@@ -47,7 +47,6 @@ RSpec.describe 'the process' do
       puts $$
       pid = spawn %(ruby), %(-e), %(sleep)
       puts pid
-      $stdout.flush
       sleep
     '], timeout: 1
     end_time = Time.now
@@ -95,23 +94,28 @@ RSpec.describe 'the process' do
   end
 
   xit 'cleans up the process and all its children when the child exits normally' do
-    result = run stdin: "abc", program: 'ruby', argv: ['-e', '
+    read, write = IO.pipe
+    filepath = File.realpath('run', __dir__)
+    program = ChildProcess.build 'ruby', filepath, '--', 'ruby', '-e', '
       puts $$
-      read, write = IO.pipe
-      spawn "ruby", "-e", "puts $$; $stdout.flush; $stderr.puts :started; $stderr.close; sleep", err: write
-      write.close
-      read.gets
-      read.close
-    ']
+      pid = spawn %(ruby), %(-e), %(sleep)
+      puts pid
+    '
+    program.io.stdout = write
+    program.io.stderr = write
+    program.start
+    write.close
 
-    # printed and exited like we expect
-    expect(result.stderr).to be_empty
-    expect(result.stdout).to match /^#{result.pid}\n(\d+)$/
-    grandchild_pid = result.stdout.lines.last.to_i
+    # get the pids
+    child_pid = read.gets
+    grandchild_pid = read.gets
+    expect(child_pid).to match /^\d+$/
+    expect(grandchild_pid).to match /^\d+$/
+
+    # they're all dead
+    assert_dead [program.pid, child_pid.to_i, grandchild_pid.to_i]
+
+    # it exited normally
     expect(result.code).to eq 0
-
-    # killed the children
-    assert_dead result.pid
-    assert_dead grandchild_pid
   end
 end
