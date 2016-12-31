@@ -47,6 +47,7 @@ RSpec.describe 'the process' do
       puts $$
       pid = spawn %(ruby), %(-e), %(sleep)
       puts pid
+      $stdout.flush
       sleep
     '], timeout: 1
     end_time = Time.now
@@ -116,6 +117,7 @@ RSpec.describe 'the process' do
     assert_dead [program.pid, child_pid.to_i, grandchild_pid.to_i]
 
     # it exited normally
-    expect(result.code).to eq 0
+    program.wait
+    expect(program.exit_code).to eq 0
   end
 end
