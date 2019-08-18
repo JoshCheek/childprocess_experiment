@@ -121,4 +121,11 @@ RSpec.describe 'the process' do
     # it exited normally
     expect(program.exit_code).to eq 0
   end
+
+  it 'handles a ruby program that deadlocks' do
+    result = run stdin: '', program: 'ruby', argv: ['-e', 'Queue.new.shift']
+    expect(result.code).to eq 1
+    expect(result.stdout).to eq ''
+    expect(result.stderr).to match /\bfatal\b/
+  end
 end
