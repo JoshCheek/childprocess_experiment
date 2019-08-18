@@ -19,4 +19,7 @@ test_script:
 
 environment:
   matrix:
-    - ruby_version: '21'
+    - ruby_version: '23'
+    - ruby_version: '24'
+    - ruby_version: '25'
+    - ruby_version: '26'
