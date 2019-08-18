@@ -123,7 +123,10 @@ RSpec.describe 'the process' do
   end
 
   it 'handles a ruby program that deadlocks' do
-    result = run stdin: '', program: 'ruby', argv: ['-e', 'Queue.new.shift']
+    result = run stdin: '', program: 'ruby', argv: ['-e', <<~RUBY]
+    require 'thread'
+    Thread.new { Queue.new.shift }.join
+    RUBY
     expect(result.code).to eq 1
     expect(result.stdout).to eq ''
     expect(result.stderr).to match /\bfatal\b/
